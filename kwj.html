@@ -1,0 +1,2121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Hierarchy Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'FedEx Sans', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4D148C, #660099);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-bottom: 4px solid #FF6600;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .upload-section {
+            padding: 30px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .file-upload {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #4D148C;
+            border-radius: 8px;
+            background: #f9f6fc;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            font-size: 1.1rem;
+            color: #4D148C;
+        }
+
+        .file-input:hover {
+            border-color: #660099;
+            background: #f0e6f7;
+        }
+
+        #fileInput {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .department-select {
+            margin-top: 20px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+            color: #333;
+        }
+
+        .results-section {
+            padding: 30px;
+        }
+
+        .summary-stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #4D148C, #660099);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .manager-section {
+            margin-bottom: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .manager-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .manager-header {
+            background: linear-gradient(135deg, #4D148C, #660099);
+            color: white;
+            padding: 20px 25px;
+            border-bottom: 3px solid #FF6600;
+        }
+
+        .manager-header h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        .manager-details {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 0.95rem;
+        }
+
+        .employee-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .job-roles-summary {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .job-roles-summary h4 {
+            margin-bottom: 10px;
+            font-size: 1rem;
+            color: white;
+        }
+
+        .job-role-item {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.25);
+            padding: 5px 10px;
+            margin: 3px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .manager-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            box-shadow: none;
+            display: none;
+        }
+
+        .manager-table th {
+            background: linear-gradient(135deg, #333333, #555555);
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .manager-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+
+        .manager-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .manager-table tr:hover {
+            background: #e3f2fd;
+            transition: background 0.3s ease;
+        }
+
+        .job-role-header {
+            font-weight: bold;
+            background: #e8f0fe;
+            color: #1967d2;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        .job-role-header:hover {
+            background: #d2e3fc !important;
+        }
+
+        .job-role-header .toggle-icon {
+            float: right;
+            transition: transform 0.3s ease;
+        }
+
+        .job-role-header.expanded .toggle-icon {
+            transform: rotate(90deg);
+        }
+
+        .employee-details {
+            display: none;
+        }
+
+        .employee-details.visible {
+            display: table-row;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .top-level-header {
+            background: linear-gradient(135deg, #0071CE, #0099D8);
+            color: white;
+            padding: 20px 25px;
+            border-bottom: 3px solid #005EB8;
+        }
+
+        .flowchart-section {
+            margin-top: 40px;
+            padding: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: none;
+            height: calc(100vh - 200px);
+            position: relative;
+        }
+
+        .flowchart-header {
+            background: linear-gradient(135deg, #4D148C, #660099);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 3px solid #FF6600;
+        }
+
+        .flowchart-header h2 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .flowchart-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .flowchart-options button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .flowchart-options button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .flowchart-options button.active {
+            background: white;
+            color: #660099;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: calc(100% - 70px);
+            background: white;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #flowchartContainer {
+            width: 100%;
+            height: 100%;
+        }
+
+        #flowchartContainer svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .node rect {
+            stroke: #333;
+            stroke-width: 1.5px;
+            rx: 3;
+            ry: 3;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .node text {
+            font-family: 'FedEx Sans', Arial, sans-serif;
+            text-anchor: middle;
+            fill: #333;
+            pointer-events: none;
+        }
+
+        .link {
+            fill: none;
+            stroke: #666;
+            stroke-width: 1.5px;
+            stroke-linecap: round;
+        }
+
+        .department-node rect {
+            fill: #4D148C;
+        }
+
+        .manager-node rect {
+            fill: #660099;
+        }
+
+        .manager-node rect:hover {
+            fill: #4D148C;
+        }
+
+        .manager-node.expanded rect {
+            fill: #4D148C;
+            stroke: white;
+            stroke-width: 2px;
+        }
+
+        .job-role-node rect {
+            fill: #0071CE;
+        }
+
+        .employee-node rect {
+            fill: #0099D8;
+        }
+
+        .top-level-node rect {
+            fill: #0099D8;
+        }
+
+        .node-label {
+            font-weight: bold;
+            fill: white;
+        }
+
+        .count-label {
+            font-size: 8px;
+            fill: rgba(255, 255, 255, 0.9);
+        }
+
+        #tooltip {
+            position: absolute;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            pointer-events: none;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+
+        #employeeModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        #employeeModal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #4D148C;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #7f8c8d;
+        }
+
+        .employee-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .employee-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .employee-card h4 {
+            margin-top: 0;
+            color: #4D148C;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+
+        .employee-card p {
+            margin: 5px 0;
+            font-size: 0.9rem;
+        }
+
+        .highlight {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .fullscreen-chart {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            background: white;
+            padding: 0;
+            margin: 0;
+            border-radius: 0;
+        }
+
+        .fullscreen-chart .chart-container {
+            height: calc(100% - 70px);
+        }
+
+        .fullscreen-chart .flowchart-header {
+            border-radius: 0;
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            min-width: 80px;
+            color: #4D148C;
+        }
+
+        .control-group input[type="range"] {
+            width: 150px;
+            accent-color: #660099;
+        }
+
+        .control-group .value-display {
+            min-width: 30px;
+            text-align: center;
+            color: #333;
+        }
+
+        .history-controls {
+            margin-left: auto;
+        }
+
+        .size-preview {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .size-preview-box {
+            border: 1px solid #ddd;
+            background: #660099;
+            display: inline-block;
+        }
+
+        @media (max-width: 768px) {
+            .flowchart-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .flowchart-options {
+                margin-top: 15px;
+                justify-content: flex-start;
+            }
+
+            .stat-card {
+                min-width: 100%;
+            }
+
+            .control-panel {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .history-controls {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+        }
+
+        /* Enhanced expand/collapse styles */
+        .expand-collapse-controls {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .expand-collapse-btn {
+            padding: 5px 10px;
+            background: #660099;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .expand-collapse-btn:hover {
+            background: #4D148C;
+        }
+
+        .job-role-group {
+            margin-bottom: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .job-role-group-header {
+            background: #e8f0fe;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .job-role-group-header h4 {
+            margin: 0;
+            color: #1967d2;
+        }
+
+        .job-role-group-content {
+            display: none;
+            padding: 0;
+        }
+
+        .job-role-group.expanded .job-role-group-content {
+            display: block;
+        }
+
+        .employee-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .employee-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .employee-item:last-child {
+            border-bottom: none;
+        }
+
+        .employee-info {
+            flex: 1;
+        }
+
+        .employee-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .employee-action-btn {
+            padding: 3px 8px;
+            background: #f1f1f1;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .employee-action-btn:hover {
+            background: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Employee Hierarchy Analyzer</h1>
+            <p>Upload Excel or JSON data to explore organizational hierarchies by department</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="file-upload">
+                <div class="file-input">
+                    <input type="file" id="fileInput" accept=".json,.xlsx,.xls,.csv" />
+                    📁 Click to upload Excel or JSON file
+                </div>
+            </div>
+
+            <div class="department-select" style="display: none;" id="departmentSelectDiv">
+                <label for="departmentSelect"><strong>Select Department:</strong></label>
+                <select id="departmentSelect">
+                    <option value="">Choose a department...</option>
+                </select>
+            </div>
+
+            <div id="status"></div>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="summary-stats" id="summaryStats"></div>
+
+            <div class="flowchart-section" id="flowchartSection">
+                <div class="flowchart-header">
+                    <h2>📊 Organizational Hierarchy Chart</h2>
+                    <div class="flowchart-options">
+                        <button id="fullscreenBtn">Fullscreen</button>
+                        <button id="verticalBtn" class="active">Top-Down</button>
+                        <button id="horizontalBtn">Left-Right</button>
+                        <button id="undoBtn" title="Undo">↩️</button>
+                        <button id="redoBtn" title="Redo">↪️</button>
+                        <button id="resetLayoutBtn">Reset Layout</button>
+                        <button id="fitChartBtn">Fit Chart</button>
+                        <button id="saveChartBtn">Save Chart</button>
+                    </div>
+                </div>
+
+                <div class="control-panel">
+                    <div class="control-group">
+                        <label for="nodeSizeSlider">Node Size:</label>
+                        <input type="range" id="nodeSizeSlider" min="0.5" max="2" step="0.1" value="1">
+                        <span class="value-display" id="nodeSizeValue">1.0x</span>
+                        <div class="size-preview">
+                            <div class="size-preview-box" id="nodeSizePreview" style="width: 20px; height: 20px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="spacingSlider">Spacing:</label>
+                        <input type="range" id="spacingSlider" min="0.5" max="2" step="0.1" value="1">
+                        <span class="value-display" id="spacingValue">1.0x</span>
+                    </div>
+
+                    <div class="control-group history-controls">
+                        <button id="saveLayoutBtn">Save Layout</button>
+                    </div>
+                </div>
+
+                <div class="chart-container" id="flowchartContainer"></div>
+            </div>
+
+            <div id="managerTables"></div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip"></div>
+
+    <!-- Employee Modal -->
+    <div id="employeeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Employee Details</h3>
+                <button class="close-modal" onclick="closeEmployeeModal()">×</button>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let employeeData = [];
+        let currentDepartment = '';
+        let currentLayout = 'vertical';
+        let hierarchyData = null;
+        let lastClickTime = 0;
+        const doubleClickThreshold = 300; // milliseconds for double-tap detection
+        let customLayoutSettings = {
+            horizontalSpacing: 150,
+            verticalSpacing: 80,
+            elbowLength: 50,
+            nodePositions: {},
+            nodeSize: 1.0,
+            spacing: 1.0
+        };
+
+        // History stack for undo/redo
+        let historyStack = [];
+        let historyPointer = -1;
+
+        // Zoom variables
+        let zoom = null;
+        let svg = null;
+        let g = null;
+        let transform = d3.zoomIdentity;
+
+        // Initialize event listeners
+        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+        document.getElementById('departmentSelect').addEventListener('change', handleDepartmentChange);
+        document.getElementById('verticalBtn').addEventListener('click', () => setLayout('vertical'));
+        document.getElementById('horizontalBtn').addEventListener('click', () => setLayout('horizontal'));
+        document.getElementById('saveLayoutBtn').addEventListener('click', saveLayoutSettings);
+        document.getElementById('resetLayoutBtn').addEventListener('click', resetLayoutSettings);
+        document.getElementById('fitChartBtn').addEventListener('click', fitChart);
+        document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+        document.getElementById('undoBtn').addEventListener('click', undoAction);
+        document.getElementById('redoBtn').addEventListener('click', redoAction);
+        document.getElementById('nodeSizeSlider').addEventListener('input', updateNodeSize);
+        document.getElementById('spacingSlider').addEventListener('input', updateSpacing);
+        document.getElementById('saveChartBtn').addEventListener('click', saveChart);
+
+        // Load saved layout settings if available
+        const savedSettings = localStorage.getItem('customLayoutSettings');
+        if (savedSettings) {
+            const parsedSettings = JSON.parse(savedSettings);
+            customLayoutSettings = {
+                ...customLayoutSettings,
+                ...parsedSettings
+            };
+            document.getElementById('nodeSizeSlider').value = customLayoutSettings.nodeSize;
+            document.getElementById('spacingSlider').value = customLayoutSettings.spacing;
+            document.getElementById('nodeSizeValue').textContent = customLayoutSettings.nodeSize.toFixed(1) + 'x';
+            document.getElementById('spacingValue').textContent = customLayoutSettings.spacing.toFixed(1) + 'x';
+            updateNodeSizePreview();
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
+                        // Process Excel file
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                        employeeData = Array.isArray(jsonData) ? jsonData : [jsonData];
+                        showStatus('Excel file uploaded successfully! ' + employeeData.length + ' records loaded.', 'success');
+                        populateDepartmentSelect();
+                    } else {
+                        // Process JSON file
+                        const jsonData = JSON.parse(e.target.result);
+                        employeeData = Array.isArray(jsonData) ? jsonData : [jsonData];
+                        showStatus('JSON file uploaded successfully! ' + employeeData.length + ' records loaded.', 'success');
+                        populateDepartmentSelect();
+                    }
+                } catch (error) {
+                    showStatus('Error parsing file. Please check the format.', 'error');
+                    console.error(error);
+                }
+            };
+            reader.onerror = function() {
+                showStatus('Error reading file.', 'error');
+            };
+
+            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+        }
+
+        function populateDepartmentSelect() {
+            const departments = [...new Set(employeeData.map(emp => emp.Department))].filter(Boolean);
+            const select = document.getElementById('departmentSelect');
+
+            select.innerHTML = '<option value="">Choose a department...</option>';
+            departments.forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept;
+                option.textContent = dept;
+                select.appendChild(option);
+            });
+
+            document.getElementById('departmentSelectDiv').style.display = 'block';
+        }
+
+        function handleDepartmentChange(event) {
+            currentDepartment = event.target.value;
+            if (currentDepartment) {
+                generateHierarchyTables();
+            } else {
+                document.getElementById('resultsSection').style.display = 'none';
+            }
+        }
+
+        function setLayout(layout) {
+            currentLayout = layout;
+            document.getElementById('verticalBtn').classList.toggle('active', layout === 'vertical');
+            document.getElementById('horizontalBtn').classList.toggle('active', layout === 'horizontal');
+
+            if (hierarchyData) {
+                pushToHistory();
+                renderCombinedFlowChart(hierarchyData);
+            }
+        }
+
+        function updateNodeSize() {
+            const value = parseFloat(document.getElementById('nodeSizeSlider').value);
+            customLayoutSettings.nodeSize = value;
+            document.getElementById('nodeSizeValue').textContent = value.toFixed(1) + 'x';
+            updateNodeSizePreview();
+
+            if (hierarchyData) {
+                pushToHistory();
+                renderCombinedFlowChart(hierarchyData);
+            }
+        }
+
+        function updateNodeSizePreview() {
+            const size = customLayoutSettings.nodeSize;
+            const baseSize = 20;
+            const previewSize = baseSize * size;
+            document.getElementById('nodeSizePreview').style.width = `${previewSize}px`;
+            document.getElementById('nodeSizePreview').style.height = `${previewSize}px`;
+        }
+
+        function updateSpacing() {
+            const value = parseFloat(document.getElementById('spacingSlider').value);
+            customLayoutSettings.spacing = value;
+            document.getElementById('spacingValue').textContent = value.toFixed(1) + 'x';
+
+            if (hierarchyData) {
+                pushToHistory();
+                renderCombinedFlowChart(hierarchyData);
+            }
+        }
+
+        function saveLayoutSettings() {
+            localStorage.setItem('customLayoutSettings', JSON.stringify(customLayoutSettings));
+            showStatus('Layout settings saved!', 'success');
+        }
+
+        function resetLayoutSettings() {
+            customLayoutSettings.nodePositions = {};
+            if (hierarchyData) {
+                pushToHistory();
+                renderCombinedFlowChart(hierarchyData);
+            }
+            showStatus('Node positions reset!', 'success');
+        }
+
+        function fitChart() {
+            if (svg && g) {
+                const container = document.getElementById('flowchartContainer');
+                const bbox = g.node().getBBox();
+
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+
+                const scale = 0.9 / Math.max(bbox.width / width, bbox.height / height);
+                const x = (width - bbox.width * scale) / 2 - bbox.x * scale;
+                const y = (height - bbox.height * scale) / 2 - bbox.y * scale;
+
+                transform = d3.zoomIdentity.translate(x, y).scale(scale);
+                svg.transition().duration(500).call(zoom.transform, transform);
+            }
+        }
+
+        function toggleFullscreen() {
+            const flowchartSection = document.getElementById('flowchartSection');
+            const isFullscreen = flowchartSection.classList.contains('fullscreen-chart');
+
+            if (isFullscreen) {
+                flowchartSection.classList.remove('fullscreen-chart');
+                document.body.style.overflow = 'auto';
+            } else {
+                flowchartSection.classList.add('fullscreen-chart');
+                document.body.style.overflow = 'hidden';
+            }
+
+            // Recalculate dimensions after fullscreen change
+            setTimeout(() => {
+                if (hierarchyData) {
+                    renderCombinedFlowChart(hierarchyData);
+                }
+            }, 100);
+        }
+
+        function pushToHistory() {
+            // Only keep history up to the current pointer
+            historyStack = historyStack.slice(0, historyPointer + 1);
+
+            // Push current state to history
+            historyStack.push({
+                nodes: JSON.parse(JSON.stringify(hierarchyData.nodes)),
+                nodePositions: JSON.parse(JSON.stringify(customLayoutSettings.nodePositions)),
+                nodeSize: customLayoutSettings.nodeSize,
+                spacing: customLayoutSettings.spacing
+            });
+
+            historyPointer = historyStack.length - 1;
+
+            // Limit history to 50 steps
+            if (historyStack.length > 50) {
+                historyStack.shift();
+                historyPointer--;
+            }
+
+            updateUndoRedoButtons();
+        }
+
+        function undoAction() {
+            if (historyPointer > 0) {
+                historyPointer--;
+                applyHistoryState(historyStack[historyPointer]);
+            }
+        }
+
+        function redoAction() {
+            if (historyPointer < historyStack.length - 1) {
+                historyPointer++;
+                applyHistoryState(historyStack[historyPointer]);
+            }
+        }
+
+        function applyHistoryState(state) {
+            if (!state) return;
+
+            hierarchyData.nodes = JSON.parse(JSON.stringify(state.nodes));
+            customLayoutSettings.nodePositions = JSON.parse(JSON.stringify(state.nodePositions));
+            customLayoutSettings.nodeSize = state.nodeSize;
+            customLayoutSettings.spacing = state.spacing;
+
+            // Update UI controls
+            document.getElementById('nodeSizeSlider').value = state.nodeSize;
+            document.getElementById('spacingSlider').value = state.spacing;
+            document.getElementById('nodeSizeValue').textContent = state.nodeSize.toFixed(1) + 'x';
+            document.getElementById('spacingValue').textContent = state.spacing.toFixed(1) + 'x';
+            updateNodeSizePreview();
+
+            // Re-render chart
+            renderCombinedFlowChart(hierarchyData);
+            updateUndoRedoButtons();
+        }
+
+        function updateUndoRedoButtons() {
+            document.getElementById('undoBtn').disabled = historyPointer <= 0;
+            document.getElementById('redoBtn').disabled = historyPointer >= historyStack.length - 1;
+        }
+
+        function generateHierarchyTables() {
+            const deptEmployees = employeeData.filter(emp => emp.Department === currentDepartment);
+
+            if (deptEmployees.length === 0) {
+                showStatus('No employees found in selected department.', 'error');
+                return;
+            }
+
+            // Build manager-employee structure
+            const managerStructure = buildManagerStructure(deptEmployees);
+
+            // Generate summary stats
+            generateSummaryStats(deptEmployees, managerStructure);
+
+            // Generate combined flow chart first
+            hierarchyData = buildHierarchyData(managerStructure, deptEmployees);
+            document.getElementById('flowchartSection').style.display = 'block';
+            renderCombinedFlowChart(hierarchyData);
+
+            // Render separate tables for each manager
+            renderManagerTables(managerStructure, deptEmployees);
+
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function buildManagerStructure(employees) {
+            const managerMap = new Map();
+
+            // Group employees by their reporting manager
+            employees.forEach(emp => {
+                const manager = emp['Reporting Manager'];
+                if (manager && manager.trim() !== '') {
+                    if (!managerMap.has(manager)) {
+                        // Find manager details
+                        const managerDetails = employees.find(e => e['Employee Name'] === manager);
+                        managerMap.set(manager, {
+                            manager: managerDetails || {
+                                'Employee Name': manager,
+                                'Job Profile': 'Manager (Details not found)',
+                                'Location': 'N/A',
+                                'Department': currentDepartment,
+                                'Reporting Manager': 'N/A'
+                            },
+                            employees: []
+                        });
+                    }
+                    managerMap.get(manager).employees.push(emp);
+                }
+            });
+
+            return managerMap;
+        }
+
+        function groupEmployeesByJobRole(employees) {
+            const jobRoleGroups = new Map();
+
+            employees.forEach(emp => {
+                const jobRole = emp['Job Profile'] || 'Unknown Role';
+                if (!jobRoleGroups.has(jobRole)) {
+                    jobRoleGroups.set(jobRole, []);
+                }
+                jobRoleGroups.get(jobRole).push(emp);
+            });
+
+            return jobRoleGroups;
+        }
+
+        function generateSummaryStats(employees, managerStructure) {
+            const totalEmployees = employees.length;
+            const managersCount = managerStructure.size;
+            const employeesWithManagers = employees.filter(emp => emp['Reporting Manager'] && emp['Reporting Manager'].trim() !== '').length;
+            const topLevelEmployees = totalEmployees - employeesWithManagers;
+
+            const summaryHTML = `
+                <div class="stat-card">
+                    <span class="stat-number">${totalEmployees}</span>
+                    <span class="stat-label">Total Employees</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number">${managersCount}</span>
+                    <span class="stat-label">Reporting Managers</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number">${employeesWithManagers}</span>
+                    <span class="stat-label">Employees with Managers</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number">${topLevelEmployees}</span>
+                    <span class="stat-label">Top Level Employees</span>
+                </div>
+            `;
+
+            document.getElementById('summaryStats').innerHTML = summaryHTML;
+        }
+
+        function renderManagerTables(managerStructure, allEmployees) {
+            const managerTablesContainer = document.getElementById('managerTables');
+            managerTablesContainer.innerHTML = '';
+
+            // Show employees without managers first
+            const employeesWithoutManagers = allEmployees.filter(emp =>
+                !emp['Reporting Manager'] || emp['Reporting Manager'].trim() === ''
+            );
+            if (employeesWithoutManagers.length > 0) {
+                renderTopLevelEmployeesTable(employeesWithoutManagers, managerTablesContainer);
+            }
+
+            // Create separate table for each manager
+            managerStructure.forEach((data, managerId) => {
+                renderManagerTable(data, managerTablesContainer);
+            });
+        }
+
+        function renderTopLevelEmployeesTable(employees, container) {
+            const jobRoleGroups = groupEmployeesByJobRole(employees);
+
+            const managerSection = document.createElement('div');
+            managerSection.className = 'manager-section';
+            managerSection.addEventListener('click', () => {
+                // Show the table for top-level employees
+                const table = managerSection.querySelector('.manager-table');
+                if (table) {
+                    table.style.display = table.style.display === 'none' ? 'table' : 'none';
+                }
+            });
+
+            const jobRolesSummary = Array.from(jobRoleGroups.entries())
+                .map(([role, emps]) => `<span class="job-role-item">${role} (${emps.length})</span>`)
+                .join('');
+
+            const managerHeader = document.createElement('div');
+            managerHeader.className = 'manager-header top-level-header';
+            managerHeader.innerHTML = `
+                <h3>🏢 Top Level Employees (No Reporting Manager)</h3>
+                <span class="employee-count">${employees.length} employees</span>
+                <div class="job-roles-summary">
+                    <h4>Job Roles Distribution:</h4>
+                    ${jobRolesSummary}
+                </div>
+            `;
+
+            const table = document.createElement('table');
+            table.className = 'manager-table';
+
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Job Profile</th>
+                        <th>Employee Count</th>
+                        <th>Primary Location</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+
+            const tbody = table.querySelector('tbody');
+
+            // Group by job role in table (collapsed by default)
+            jobRoleGroups.forEach((roleEmployees, jobRole) => {
+                // Add job role header row (clickable to expand)
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'job-role-header';
+                headerRow.innerHTML = `
+                    <td><strong>📋 ${jobRole}</strong> <span class="toggle-icon">▶</span></td>
+                    <td><strong>${roleEmployees.length}</strong></td>
+                    <td><strong>${getMostCommonLocation(roleEmployees)}</strong></td>
+                `;
+
+                headerRow.addEventListener('click', () => toggleEmployeeDetails(headerRow, jobRole, roleEmployees));
+                tbody.appendChild(headerRow);
+            });
+
+            managerSection.appendChild(managerHeader);
+            managerSection.appendChild(table);
+            container.appendChild(managerSection);
+        }
+
+        function renderManagerTable(data, container) {
+            const jobRoleGroups = groupEmployeesByJobRole(data.employees);
+
+            const managerSection = document.createElement('div');
+            managerSection.className = 'manager-section';
+            managerSection.addEventListener('click', () => {
+                // Show the table for this manager
+                const table = managerSection.querySelector('.manager-table');
+                if (table) {
+                    table.style.display = table.style.display === 'none' ? 'table' : 'none';
+                }
+            });
+
+            const jobRolesSummary = Array.from(jobRoleGroups.entries())
+                .map(([role, emps]) => `<span class="job-role-item">${role} (${emps.length})</span>`)
+                .join('');
+
+            const managerHeader = document.createElement('div');
+            managerHeader.className = 'manager-header';
+            managerHeader.innerHTML = `
+                <h3>👨‍💼 Manager: ${data.manager['Employee Name'] || 'Unknown'}</h3>
+                <div class="manager-details">
+                    <span><strong>Employee ID:</strong> ${data.manager['Employee ID'] || 'N/A'}</span>
+                    <span><strong>Job Profile:</strong> ${data.manager['Job Profile'] || 'N/A'}</span>
+                    <span><strong>Location:</strong> ${data.manager['Location'] || 'N/A'}</span>
+                    <span class="employee-count">${data.employees.length} direct reports</span>
+                </div>
+                <div class="job-roles-summary">
+                    <h4>Job Roles Distribution:</h4>
+                    ${jobRolesSummary}
+                </div>
+            `;
+
+            const table = document.createElement('table');
+            table.className = 'manager-table';
+
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Job Profile</th>
+                        <th>Employee Count</th>
+                        <th>Primary Location</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+
+            const tbody = table.querySelector('tbody');
+
+            // Group by job role in table (collapsed by default)
+            jobRoleGroups.forEach((roleEmployees, jobRole) => {
+                // Add job role header row (clickable to expand)
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'job-role-header';
+                headerRow.innerHTML = `
+                    <td><strong>📋 ${jobRole}</strong> <span class="toggle-icon">▶</span></td>
+                    <td><strong>${roleEmployees.length}</strong></td>
+                    <td><strong>${getMostCommonLocation(roleEmployees)}</strong></td>
+                `;
+
+                headerRow.addEventListener('click', () => toggleEmployeeDetails(headerRow, jobRole, roleEmployees));
+                tbody.appendChild(headerRow);
+            });
+
+            managerSection.appendChild(managerHeader);
+            managerSection.appendChild(table);
+            container.appendChild(managerSection);
+        }
+
+        function buildHierarchyData(managerStructure, allEmployees) {
+            const nodes = [];
+            const links = [];
+            let nodeId = 0;
+
+            // Add department root node
+            const rootNode = {
+                id: nodeId++,
+                name: `${currentDepartment} Department`,
+                type: 'department',
+                count: allEmployees.length,
+                expanded: true
+            };
+            nodes.push(rootNode);
+
+            // Add top-level employees without managers
+            const employeesWithoutManagers = allEmployees.filter(emp =>
+                !emp['Reporting Manager'] || emp['Reporting Manager'].trim() === ''
+            );
+
+            if (employeesWithoutManagers.length > 0) {
+                const topLevelGroups = groupEmployeesByJobRole(employeesWithoutManagers);
+
+                topLevelGroups.forEach((employees, jobRole) => {
+                    const jobRoleNode = {
+                        id: nodeId++,
+                        name: jobRole,
+                        type: 'top-level-role',
+                        count: employees.length,
+                        employees: employees,
+                        fullName: `${jobRole} (Top Level)`,
+                        expanded: false
+                    };
+                    nodes.push(jobRoleNode);
+
+                    links.push({
+                        source: rootNode.id,
+                        target: jobRoleNode.id
+                    });
+
+                    // Add individual employee nodes for top-level employees (hidden by default)
+                    employees.forEach(emp => {
+                        const employeeNode = {
+                            id: nodeId++,
+                            name: emp['Employee Name'],
+                            type: 'employee',
+                            count: 1,
+                            employees: [emp],
+                            fullName: `${emp['Employee Name']} - ${emp['Job Profile']} (${emp['Employee ID'] || 'N/A'})`,
+                            hidden: true
+                        };
+                        nodes.push(employeeNode);
+
+                        links.push({
+                            source: jobRoleNode.id,
+                            target: employeeNode.id
+                        });
+                    });
+                });
+            }
+
+            // Add managers and their job roles
+            managerStructure.forEach((data, managerId) => {
+                const managerNode = {
+                    id: nodeId++,
+                    name: data.manager['Employee Name'] || 'Unknown',
+                    type: 'manager',
+                    count: data.employees.length,
+                    employees: [data.manager],
+                    fullName: `${data.manager['Employee Name']} - ${data.manager['Job Profile']} (${data.manager['Employee ID'] || 'N/A'})`,
+                    expanded: false
+                };
+                nodes.push(managerNode);
+
+                links.push({
+                    source: rootNode.id,
+                    target: managerNode.id
+                });
+
+                // Add job role nodes (hidden by default)
+                const jobRoleGroups = groupEmployeesByJobRole(data.employees);
+                jobRoleGroups.forEach((employees, jobRole) => {
+                    const jobRoleNode = {
+                        id: nodeId++,
+                        name: jobRole,
+                        type: 'job-role',
+                        count: employees.length,
+                        employees: employees,
+                        managerId: managerNode.id,
+                        hidden: true,
+                        fullName: `${jobRole} (${employees.length} employees)`,
+                        expanded: false
+                    };
+                    nodes.push(jobRoleNode);
+
+                    links.push({
+                        source: managerNode.id,
+                        target: jobRoleNode.id
+                    });
+
+                    // Add individual employee nodes (hidden by default)
+                    employees.forEach(emp => {
+                        const employeeNode = {
+                            id: nodeId++,
+                            name: emp['Employee Name'],
+                            type: 'employee',
+                            count: 1,
+                            employees: [emp],
+                            managerId: managerNode.id,
+                            hidden: true,
+                            fullName: `${emp['Employee Name']} - ${emp['Job Profile']} (${emp['Employee ID'] || 'N/A'})`
+                        };
+                        nodes.push(employeeNode);
+
+                        links.push({
+                            source: jobRoleNode.id,
+                            target: employeeNode.id
+                        });
+                    });
+                });
+            });
+
+            return { nodes, links };
+        }
+
+        function renderCombinedFlowChart(data) {
+            const container = d3.select('#flowchartContainer');
+            container.selectAll("*").remove();
+
+            // Calculate required dimensions based on hierarchy depth and breadth
+            const hierarchyDepth = getHierarchyDepth(data);
+            const hierarchyBreadth = getHierarchyBreadth(data);
+
+            // Set dynamic dimensions with spacing multiplier
+            const baseWidth = 1200;
+            const baseHeight = 800;
+            const width = Math.max(baseWidth, hierarchyBreadth * 200 * customLayoutSettings.spacing);
+            const height = Math.max(baseHeight, hierarchyDepth * 120 * customLayoutSettings.spacing);
+            const margin = { top: 40, right: 120, bottom: 40, left: 120 };
+
+            svg = container.append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('viewBox', `0 0 ${width} ${height}`)
+                .call(d3.zoom()
+                    .scaleExtent([0.1, 5])
+                    .on('zoom', (event) => {
+                        g.attr('transform', event.transform);
+                        transform = event.transform;
+                    }))
+                .on('dblclick.zoom', null); // Disable double-click zoom
+
+            g = svg.append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Create hierarchical layout
+            const root = d3.stratify()
+                .id(d => d.id)
+                .parentId(d => {
+                    const link = data.links.find(l => l.target === d.id);
+                    return link ? link.source : null;
+                })(data.nodes);
+
+            // Custom tree layout with dynamic spacing
+            const treeLayout = d3.tree()
+                .size(currentLayout === 'vertical'
+                    ? [width - margin.left - margin.right, height - margin.top - margin.bottom]
+                    : [height - margin.top - margin.bottom, width - margin.left - margin.right])
+                .separation((a, b) => (a.parent === b.parent ? 1 : 1.5) / a.depth * customLayoutSettings.spacing);
+
+            const treeData = treeLayout(root);
+
+            // Apply custom positions if they exist
+            treeData.each(node => {
+                if (customLayoutSettings.nodePositions[node.data.id]) {
+                    const pos = customLayoutSettings.nodePositions[node.data.id];
+                    if (pos.x !== undefined && pos.y !== undefined) {
+                        node.x = pos.x;
+                        node.y = pos.y;
+                    }
+                }
+            });
+
+            // Create elbow links
+            const link = g.selectAll('.link')
+                .data(treeData.links().filter(d => !d.target.data.hidden))
+                .enter().append('path')
+                .attr('class', 'link')
+                .attr('d', d => {
+                    const elbowLength = customLayoutSettings.nodePositions[d.target.data.id]?.elbowLength ||
+                                      customLayoutSettings.elbowLength * customLayoutSettings.spacing;
+
+                    if (currentLayout === 'vertical') {
+                        return `M${d.source.x},${d.source.y}
+                                V${d.source.y + elbowLength}
+                                H${d.target.x}
+                                V${d.target.y}`;
+                    } else {
+                        return `M${d.source.y},${d.source.x}
+                                H${d.source.y + elbowLength}
+                                V${d.target.x}
+                                H${d.target.y}`;
+                    }
+                })
+                .style('fill', 'none')
+                .style('stroke', '#666')
+                .style('opacity', 0.8)
+                .style('stroke-width', 1.5 * customLayoutSettings.nodeSize);
+
+            // Create nodes with double-tap functionality
+            const node = g.selectAll('.node')
+                .data(treeData.descendants().filter(d => !d.data.hidden))
+                .enter().append('g')
+                .attr('class', d => `node ${d.data.type}-node ${d.data.expanded ? 'expanded' : ''}`)
+                .attr('transform', d => currentLayout === 'vertical'
+                    ? `translate(${d.x},${d.y})`
+                    : `translate(${d.y},${d.x})`)
+                .on('click', function(event, d) {
+                    const now = Date.now();
+                    const isDoubleClick = (now - lastClickTime) < doubleClickThreshold;
+                    lastClickTime = now;
+
+                    if (isDoubleClick && (d.data.type === 'manager' || d.data.type === 'job-role' || d.data.type === 'top-level-role')) {
+                        // Double-click on manager or job role - show all employees directly
+                        d3.select(this).classed('highlight', true);
+                        setTimeout(() => d3.select(this).classed('highlight', false), 500);
+
+                        // Collect all employees under this node
+                        let allEmployees = [];
+                        if (d.data.type === 'manager') {
+                            data.nodes.forEach(n => {
+                                if ((n.type === 'job-role' || n.type === 'employee') && n.managerId === d.data.id) {
+                                    allEmployees.push(...n.employees);
+                                }
+                            });
+                        } else {
+                            allEmployees = d.data.employees || [];
+                        }
+
+                        // Show in modal
+                        showEmployeeModal({
+                            name: d.data.name,
+                            type: d.data.type,
+                            count: allEmployees.length,
+                            employees: allEmployees,
+                            fullName: `All employees under ${d.data.name}`
+                        });
+                    } else if (d.data.type === 'manager' || d.data.type === 'job-role' || d.data.type === 'top-level-role') {
+                        // Single click - toggle expansion of children
+                        pushToHistory();
+
+                        const wasExpanded = d.data.expanded;
+                        d.data.expanded = !wasExpanded;
+
+                        // For managers, toggle job roles visibility
+                        if (d.data.type === 'manager') {
+                            data.nodes.forEach(n => {
+                                if (n.type === 'job-role' && n.managerId === d.data.id) {
+                                    n.hidden = !d.data.expanded;
+                                    // Also hide employees if collapsing
+                                    if (!d.data.expanded) {
+                                        data.nodes.forEach(emp => {
+                                            if (emp.type === 'employee' && emp.managerId === d.data.id) {
+                                                emp.hidden = true;
+                                            }
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                        // For job roles, toggle employees visibility
+                        else if (d.data.type === 'job-role' || d.data.type === 'top-level-role') {
+                            data.nodes.forEach(n => {
+                                if (n.type === 'employee' && data.links.some(l => l.source === d.data.id && l.target === n.id)) {
+                                    n.hidden = !d.data.expanded;
+                                }
+                            });
+                        }
+
+                        renderCombinedFlowChart(data);
+                    } else if (d.data.type === 'employee') {
+                        // Single click on employee - show employee details
+                        showEmployeeModal(d.data);
+                    }
+                })
+                .on('mouseover', function(event, d) {
+                    showTooltip(event, d.data);
+                })
+                .on('mouseout', hideTooltip)
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            function dragstarted(event, d) {
+                d3.select(this).raise().classed('active', true);
+            }
+
+            function dragged(event, d) {
+                const newX = currentLayout === 'vertical' ? event.x : event.y;
+                const newY = currentLayout === 'vertical' ? event.y : event.x;
+
+                d3.select(this).attr('transform', currentLayout === 'vertical'
+                    ? `translate(${newX},${newY})`
+                    : `translate(${newY},${newX})`);
+
+                // Update the node's position in our custom settings
+                if (!customLayoutSettings.nodePositions[d.data.id]) {
+                    customLayoutSettings.nodePositions[d.data.id] = {};
+                }
+                customLayoutSettings.nodePositions[d.data.id].x = newX;
+                customLayoutSettings.nodePositions[d.data.id].y = newY;
+            }
+
+            function dragended(event, d) {
+                d3.select(this).classed('active', false);
+                pushToHistory();
+                renderCombinedFlowChart(data); // Redraw to update links
+            }
+
+            // Calculate base node dimensions
+            const baseDimensions = {
+                department: { width: 120, height: 40, fontSize: 11 },
+                manager: { width: 100, height: 35, fontSize: 10 },
+                'job-role': { width: 90, height: 30, fontSize: 9 },
+                'top-level-role': { width: 90, height: 30, fontSize: 9 },
+                employee: { width: 80, height: 25, fontSize: 8 }
+            };
+
+            // Add rectangles for nodes with scaled dimensions
+            node.append('rect')
+                .attr('width', d => baseDimensions[d.data.type].width * customLayoutSettings.nodeSize)
+                .attr('height', d => baseDimensions[d.data.type].height * customLayoutSettings.nodeSize)
+                .attr('x', d => -baseDimensions[d.data.type].width * customLayoutSettings.nodeSize / 2)
+                .attr('y', d => -baseDimensions[d.data.type].height * customLayoutSettings.nodeSize / 2)
+                .style('fill', d => {
+                    switch(d.data.type) {
+                        case 'department': return '#4D148C';
+                        case 'manager': return d.data.expanded ? '#4D148C' : '#660099';
+                        case 'job-role': return '#0071CE';
+                        case 'employee': return '#0099D8';
+                        case 'top-level-role': return '#0099D8';
+                        default: return '#95a5a6';
+                    }
+                })
+                .style('stroke', d => d.data.expanded ? 'white' : '#333')
+                .style('stroke-width', d => d.data.expanded ? '2px' : '1.5px');
+
+            // Add text labels with scaled font size
+            node.append('text')
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'middle')
+                .style('font-size', d => `${baseDimensions[d.data.type].fontSize * customLayoutSettings.nodeSize}px`)
+                .style('font-weight', 'bold')
+                .style('fill', 'white')
+                .text(d => {
+                    const maxLength = d.data.type === 'department' ? 15 : 12;
+                    return d.data.name.length > maxLength ?
+                           d.data.name.substring(0, maxLength) + '...' :
+                           d.data.name;
+                });
+
+            // Add count labels for managers and roles
+            node.filter(d => d.data.type === 'manager' || d.data.type === 'top-level-role' || d.data.type === 'job-role')
+                .append('text')
+                .attr('dy', '1.2em')
+                .attr('text-anchor', 'middle')
+                .style('font-size', d => `${8 * customLayoutSettings.nodeSize}px`)
+                .style('fill', 'rgba(255,255,255,0.9)')
+                .text(d => `(${d.data.count})`);
+
+            // Fit the chart to view initially
+            setTimeout(fitChart, 100);
+        }
+
+        function saveChart() {
+            // Create a temporary SVG container
+            const tempSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+
+            // Clone the current hierarchy data
+            const saveData = JSON.parse(JSON.stringify(hierarchyData));
+
+            // Show all nodes for the saved version
+            saveData.nodes.forEach(node => {
+                node.hidden = false;
+                node.expanded = true;
+            });
+
+            // Calculate dimensions for the saved chart
+            const hierarchyDepth = getHierarchyDepth(saveData);
+            const hierarchyBreadth = getHierarchyBreadth(saveData);
+
+            const width = Math.max(1200, hierarchyBreadth * 300);
+            const height = Math.max(800, hierarchyDepth * 150);
+            const margin = { top: 40, right: 120, bottom: 40, left: 120 };
+
+            // Set SVG attributes
+            tempSvg.setAttribute("width", width);
+            tempSvg.setAttribute("height", height);
+            tempSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+            // Create a group for the content
+            const tempG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            tempG.setAttribute("transform", `translate(${margin.left},${margin.top})`);
+            tempSvg.appendChild(tempG);
+
+            // Create hierarchical layout for saving
+            const root = d3.stratify()
+                .id(d => d.id)
+                .parentId(d => {
+                    const link = saveData.links.find(l => l.target === d.id);
+                    return link ? link.source : null;
+                })(saveData.nodes);
+
+            // Tree layout for saving (horizontal)
+            const treeLayout = d3.tree()
+                .size([height - margin.top - margin.bottom, width - margin.left - margin.right]);
+
+            const treeData = treeLayout(root);
+
+            // Create links
+            treeData.links().forEach(link => {
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const elbowLength = 50;
+
+                const d = `M${link.source.y},${link.source.x}
+                           H${link.source.y + elbowLength}
+                           V${link.target.x}
+                           H${link.target.y}`;
+
+                path.setAttribute("d", d);
+                path.setAttribute("fill", "none");
+                path.setAttribute("stroke", "#666");
+                path.setAttribute("stroke-width", "1.5");
+                tempG.appendChild(path);
+            });
+
+            // Create nodes
+            treeData.descendants().forEach(d => {
+                const nodeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                nodeGroup.setAttribute("transform", `translate(${d.y},${d.x})`);
+
+                // Base dimensions for saved nodes
+                const baseDimensions = {
+                    department: { width: 120, height: 40, fontSize: 11 },
+                    manager: { width: 100, height: 35, fontSize: 10 },
+                    'job-role': { width: 90, height: 30, fontSize: 9 },
+                    'top-level-role': { width: 90, height: 30, fontSize: 9 },
+                    employee: { width: 80, height: 25, fontSize: 8 }
+                };
+
+                const dimensions = baseDimensions[d.data.type];
+
+                // Create rectangle
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                rect.setAttribute("width", dimensions.width);
+                rect.setAttribute("height", dimensions.height);
+                rect.setAttribute("x", -dimensions.width / 2);
+                rect.setAttribute("y", -dimensions.height / 2);
+                rect.setAttribute("rx", "3");
+                rect.setAttribute("ry", "3");
+                rect.setAttribute("stroke", "#333");
+                rect.setAttribute("stroke-width", "1.5");
+
+                // Set fill color based on node type
+                switch(d.data.type) {
+                    case 'department': rect.setAttribute("fill", "#4D148C"); break;
+                    case 'manager': rect.setAttribute("fill", "#660099"); break;
+                    case 'job-role': rect.setAttribute("fill", "#0071CE"); break;
+                    case 'employee': rect.setAttribute("fill", "#0099D8"); break;
+                    case 'top-level-role': rect.setAttribute("fill", "#0099D8"); break;
+                    default: rect.setAttribute("fill", "#95a5a6"); break;
+                }
+
+                nodeGroup.appendChild(rect);
+
+                // Create text label
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("dy", "0.35em");
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("font-size", `${dimensions.fontSize}px`);
+                text.setAttribute("font-weight", "bold");
+                text.setAttribute("fill", "white");
+
+                const maxLength = d.data.type === 'department' ? 15 : 12;
+                const displayName = d.data.name.length > maxLength ?
+                    d.data.name.substring(0, maxLength) + '...' :
+                    d.data.name;
+
+                text.textContent = displayName;
+                nodeGroup.appendChild(text);
+
+                // Add count label for managers and roles
+                if (d.data.type === 'manager' || d.data.type === 'top-level-role' || d.data.type === 'job-role') {
+                    const countText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    countText.setAttribute("dy", "1.2em");
+                    countText.setAttribute("text-anchor", "middle");
+                    countText.setAttribute("font-size", "8px");
+                    countText.setAttribute("fill", "rgba(255,255,255,0.9)");
+                    countText.textContent = `(${d.data.count})`;
+                    nodeGroup.appendChild(countText);
+                }
+
+                tempG.appendChild(nodeGroup);
+            });
+
+            // Convert SVG to string
+            const serializer = new XMLSerializer();
+            let svgStr = serializer.serializeToString(tempSvg);
+
+            // Add XML declaration
+            svgStr = '<?xml version="1.0" standalone="no"?>\n' + svgStr;
+
+            // Create blob and download
+            const blob = new Blob([svgStr], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentDepartment.replace(/[^a-z0-9]/gi, '_')}_hierarchy.svg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showStatus('Chart saved as SVG!', 'success');
+        }
+
+        function getHierarchyDepth(data) {
+            let maxDepth = 0;
+            const nodeMap = new Map();
+
+            // Build node map
+            data.nodes.forEach(node => {
+                nodeMap.set(node.id, { ...node, depth: 0, children: [] });
+            });
+
+            // Build tree structure
+            data.links.forEach(link => {
+                const parent = nodeMap.get(link.source);
+                const child = nodeMap.get(link.target);
+                if (parent && child) {
+                    parent.children.push(child);
+                }
+            });
+
+            // Calculate depths
+            const calculateDepth = (node, depth) => {
+                node.depth = depth;
+                maxDepth = Math.max(maxDepth, depth);
+                node.children.forEach(child => calculateDepth(child, depth + 1));
+            };
+
+            // Start from root (assuming first node is root)
+            if (data.nodes.length > 0) {
+                calculateDepth(nodeMap.get(data.nodes[0].id), 0);
+            }
+
+            return maxDepth + 1; // Add 1 because depth starts at 0
+        }
+
+        function getHierarchyBreadth(data) {
+            let maxBreadth = 0;
+            const nodeMap = new Map();
+
+            // Build node map
+            data.nodes.forEach(node => {
+                nodeMap.set(node.id, { ...node, breadth: 0, children: [] });
+            });
+
+            // Build tree structure
+            data.links.forEach(link => {
+                const parent = nodeMap.get(link.source);
+                const child = nodeMap.get(link.target);
+                if (parent && child) {
+                    parent.children.push(child);
+                }
+            });
+
+            // Calculate breadth at each level
+            const levelMap = new Map();
+
+            const calculateBreadth = (node, level) => {
+                if (!levelMap.has(level)) {
+                    levelMap.set(level, 0);
+                }
+                levelMap.set(level, levelMap.get(level) + 1);
+                maxBreadth = Math.max(maxBreadth, levelMap.get(level));
+                node.children.forEach(child => calculateBreadth(child, level + 1));
+            };
+
+            // Start from root (assuming first node is root)
+            if (data.nodes.length > 0) {
+                calculateBreadth(nodeMap.get(data.nodes[0].id), 0);
+            }
+
+            return maxBreadth;
+        }
+
+        function toggleEmployeeDetails(headerRow, jobRole, employees) {
+            const roleClass = `job-role-${jobRole.replace(/\s+/g, '-')}`;
+            const nextRow = headerRow.nextElementSibling;
+            const toggleIcon = headerRow.querySelector('.toggle-icon');
+            const isExpanded = headerRow.classList.contains('expanded');
+
+            if (isExpanded) {
+                // Collapse - remove all employee rows
+                let currentRow = nextRow;
+                while (currentRow && currentRow.className.includes(roleClass)) {
+                    const next = currentRow.nextElementSibling;
+                    currentRow.remove();
+                    currentRow = next;
+                }
+                headerRow.classList.remove('expanded');
+                toggleIcon.textContent = '▶';
+            } else {
+                // Expand - add employee rows
+                headerRow.classList.add('expanded');
+                toggleIcon.textContent = '▼';
+
+                employees.forEach(emp => {
+                    const row = document.createElement('tr');
+                    row.className = `employee-details ${roleClass}`;
+                    row.innerHTML = `
+                        <td style="padding-left: 30px;">${emp['Employee Name'] || 'N/A'}</td>
+                        <td>Individual</td>
+                        <td>${emp['Location'] || 'N/A'}</td>
+                    `;
+                    headerRow.parentNode.insertBefore(row, nextRow);
+                });
+            }
+        }
+
+        function getMostCommonLocation(employees) {
+            const locationCounts = {};
+            employees.forEach(emp => {
+                const location = emp['Location'] || 'N/A';
+                locationCounts[location] = (locationCounts[location] || 0) + 1;
+            });
+
+            return Object.keys(locationCounts).reduce((a, b) =>
+                locationCounts[a] > locationCounts[b] ? a : b
+            );
+        }
+
+        function showEmployeeModal(nodeData) {
+            const modal = document.getElementById('employeeModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = `${nodeData.name} - Employee Details`;
+
+            // Create expand/collapse controls
+            const controlsHTML = `
+                <div class="expand-collapse-controls">
+                    <button class="expand-collapse-btn" onclick="expandAllGroups()">Expand All</button>
+                    <button class="expand-collapse-btn" onclick="collapseAllGroups()">Collapse All</button>
+                </div>
+            `;
+
+            // Group employees by job role if showing multiple employees
+            let employeeCardsHTML = '';
+            if (nodeData.employees.length > 1) {
+                const jobRoleGroups = groupEmployeesByJobRole(nodeData.employees);
+
+                Array.from(jobRoleGroups.entries()).forEach(([jobRole, employees]) => {
+                    employeeCardsHTML += `
+                        <div class="job-role-group">
+                            <div class="job-role-group-header" onclick="toggleGroup(this)">
+                                <h4>${jobRole} (${employees.length})</h4>
+                                <span class="toggle-icon">▶</span>
+                            </div>
+                            <div class="job-role-group-content">
+                                <ul class="employee-list">
+                                    ${employees.map(emp => `
+                                        <li class="employee-item">
+                                            <div class="employee-info">
+                                                <strong>${emp['Employee Name'] || 'N/A'}</strong>
+                                                <div>${emp['Employee ID'] || 'N/A'} | ${emp['Location'] || 'N/A'}</div>
+                                            </div>
+                                            <div class="employee-actions">
+                                                <button class="employee-action-btn" onclick="showSingleEmployee(event, ${JSON.stringify(emp).replace(/"/g, '&quot;')})">View</button>
+                                            </div>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else if (nodeData.employees.length === 1) {
+                // Single employee view
+                const emp = nodeData.employees[0];
+                employeeCardsHTML = `
+                    <div class="employee-card">
+                        <h4>${emp['Employee Name'] || 'N/A'}</h4>
+                        <p><strong>Employee ID:</strong> ${emp['Employee ID'] || 'N/A'}</p>
+                        <p><strong>Job Profile:</strong> ${emp['Job Profile'] || 'N/A'}</p>
+                        <p><strong>Department:</strong> ${emp['Department'] || 'N/A'}</p>
+                        <p><strong>Location:</strong> ${emp['Location'] || 'N/A'}</p>
+                        <p><strong>Reporting Manager:</strong> ${emp['Reporting Manager'] || 'None'}</p>
+                        ${emp['Email'] ? `<p><strong>Email:</strong> ${emp['Email']}</p>` : ''}
+                        ${emp['Phone'] ? `<p><strong>Phone:</strong> ${emp['Phone']}</p>` : ''}
+                    </div>
+                `;
+            }
+
+            modalContent.innerHTML = controlsHTML + employeeCardsHTML;
+            modal.classList.add('active');
+        }
+
+        function toggleGroup(header) {
+            const group = header.parentElement;
+            group.classList.toggle('expanded');
+            const icon = header.querySelector('.toggle-icon');
+            icon.textContent = group.classList.contains('expanded') ? '▼' : '▶';
+        }
+
+        function expandAllGroups() {
+            document.querySelectorAll('.job-role-group').forEach(group => {
+                group.classList.add('expanded');
+                const icon = group.querySelector('.toggle-icon');
+                if (icon) icon.textContent = '▼';
+            });
+        }
+
+        function collapseAllGroups() {
+            document.querySelectorAll('.job-role-group').forEach(group => {
+                group.classList.remove('expanded');
+                const icon = group.querySelector('.toggle-icon');
+                if (icon) icon.textContent = '▶';
+            });
+        }
+
+        function showSingleEmployee(event, emp) {
+            event.stopPropagation();
+            showEmployeeModal({
+                name: emp['Employee Name'],
+                type: 'employee',
+                count: 1,
+                employees: [emp],
+                fullName: `${emp['Employee Name']} - ${emp['Job Profile']} (${emp['Employee ID'] || 'N/A'})`
+            });
+        }
+
+        function closeEmployeeModal() {
+            document.getElementById('employeeModal').classList.remove('active');
+        }
+
+        function showTooltip(event, data) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.opacity = '1';
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY - 10) + 'px';
+            tooltip.innerHTML = `
+                <strong>${data.fullName || data.name}</strong><br>
+                Employees: ${data.count}<br>
+                Type: ${data.type.replace('-', ' ')}
+                ${data.manager ? `<br>Manager: ${data.manager['Employee Name']}` : ''}
+            `;
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.opacity = '0';
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        // Make functions available globally for HTML onclick handlers
+        window.toggleGroup = toggleGroup;
+        window.expandAllGroups = expandAllGroups;
+        window.collapseAllGroups = collapseAllGroups;
+        window.showSingleEmployee = showSingleEmployee;
+        window.closeEmployeeModal = closeEmployeeModal;
+    </script>
+</body>
+</html>
